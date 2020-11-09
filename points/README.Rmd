@@ -1,0 +1,126 @@
+---
+output: github_document
+---
+
+# Day 1, points
+
+
+```{r}
+library(sf)
+library(tidyverse)
+library(viridis)
+library(raster)
+```
+
+
+```{r}
+stops <- read_csv("resources/stops.csv")
+
+# read canton borders
+canton_geo <- read_sf("resources/g2k15.shp")
+
+# read country borders
+country_geo <- read_sf("resources/g2l15.shp")
+
+# read lakes
+lake_geo <- read_sf("resources/g2s15.shp")
+```
+
+
+```{r}
+stops <- stops %>%
+  mutate(geometry = map2(long_swiss, lat_swiss, c)) %>%
+  mutate(geometry = map(geometry, st_point)) %>%
+  mutate(geometry = st_as_sfc(geometry)) %>%
+  st_as_sf() %>%
+  st_set_crs(21781)
+```
+
+
+
+
+```{r}
+stops_swiss <- st_intersection(stops, country_geo)
+```
+
+
+
+
+
+```{r}
+
+relief <- raster("resources/02-relief-ascii.asc") %>%
+  # hide relief outside of Switzerland by masking with country borders
+  mask(country_geo) %>%
+  as("SpatialPixelsDataFrame") %>%
+  as.data.frame() %>%
+  dplyr::rename(value = X02.relief.ascii)
+```
+
+
+```{r eval = FALSE}
+ggplot(data = stops) +
+  geom_raster(
+    data = relief,
+    mapping = aes(
+      x = x,
+      y = y,
+      alpha = value
+    )
+  ) +
+  scale_alpha(
+    name = "",
+    range = c(0.6, 0),
+    guide = F
+  ) +
+  geom_sf(
+    data = canton_geo,
+    fill = "transparent",
+    color = "lightgrey",
+    size = 0.5
+  ) +
+  # draw lakes in light blue
+  geom_sf(
+    data = lake_geo,
+    fill = "#D6F1FF",
+    color = "transparent"
+  ) +
+  geom_sf(data = stops_swiss, alpha = 0.2, color = "#2a5674", size = 0.7) +
+  scale_fill_distiller(palette = "Greys") +
+  labs(
+    title = "Public transport <span style='color:#2a5674'>stops</span> in Switzerland",
+    caption = "<span style='color:#636363'>Source: SBB CFF open data</span>"
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(hjust = 0.5, color = "#4e4d47"),
+    plot.subtitle = element_text(
+      hjust = 0.5, color = "#4e4d47",
+      margin = margin(
+        b = -0.1,
+        t = -0.1,
+        l = 2,
+        unit = "cm"
+      ),
+      debug = F
+    ),
+    legend.title = element_text(size = 8),
+    axis.line = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_line(color = "#ebebe5", size = 0.2),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA),
+    legend.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.border = element_blank(),
+    plot.title = ggtext::element_markdown(),
+    plot.caption = ggtext::element_markdown(),
+    legend.position = "none"
+  )
+
+# ggsave("public_transport.png")
+```
